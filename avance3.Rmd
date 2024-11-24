@@ -1,0 +1,114 @@
+---
+title: "entrega3final"
+author: "yo"
+date: "2024-11-24"
+output: html_document
+---
+
+```{r}
+if (!require(tidyverse)) install.packages("tidyverse")
+if (!require(ggplot2)) install.packages("ggplot2")
+if (!require(cluster)) install.packages("cluster")
+if (!require(corrplot)) install.packages("corrplot")
+if (!require(car)) install.packages("car")
+if (!require(shiny)) install.packages("shiny")
+if (!require(shinydashboard)) install.packages("shinydashboard")
+if (!require(readxl)) install.packages("readxl")
+
+library(tidyverse)
+library(ggplot2)
+library(cluster)
+library(corrplot)
+library(car)
+library(shiny)
+library(shinydashboard)
+library(readxl)
+
+file_path <- "C:/Users/Leonardo/Downloads/tabla_combinadafinal.xlsx"
+df <- as.data.frame(readxl::read_excel(file_path))
+
+df <- df %>%
+  mutate(democracia_grupo = ntile(democracia, 4))
+
+histograma_democracia <- function() {
+  ggplot(df, aes(x = democracia)) +
+    geom_histogram(binwidth = 0.5, fill = "blue", color = "black") +
+    theme_minimal() +
+    labs(title = "Distribución del Índice de Democracia", x = "Democracia", y = "Frecuencia")
+}
+
+boxplot_inversion <- function() {
+  ggplot(df, aes(x = factor(democracia_grupo), y = inversion)) +
+    geom_boxplot(fill = "purple", color = "black") +
+    theme_minimal() +
+    labs(title = "Inversión en I+D por Grupos de Democracia", x = "Grupo de Democracia (Cuartiles)", y = "Inversión (% PIB)")
+}
+
+dispersión <- function() {
+  ggplot(df, aes(x = democracia, y = inversion)) +
+    geom_point(color = "darkgreen") +
+    geom_smooth(method = "lm", color = "red") +
+    theme_minimal() +
+    labs(title = "Relación entre Democracia e Inversión", x = "Democracia", y = "Inversión (% PIB)")
+}
+
+correlación <- function() {
+  cor_matrix <- cor(df %>% select(democracia, inversion, idh, estabilidad, pib, patentes), use = "complete.obs")
+  corrplot::corrplot(cor_matrix, method = "circle", type = "upper", tl.cex = 0.8)
+}
+
+dendrograma <- function() {
+  scaled_data <- scale(df %>% select(democracia, inversion, pib, patentes))
+  agnes_model <- cluster::agnes(scaled_data)
+  plot(agnes_model, which.plots = 2, main = "Dendrograma (AGNES)")
+}
+
+ui <- dashboardPage(
+  dashboardHeader(title = "Dashboard de Análisis"),
+  dashboardSidebar(
+    sidebarMenu(
+      menuItem("Distribución de Democracia", tabName = "distribucion", icon = icon("chart-bar")),
+      menuItem("Relación Democracia-Inversión", tabName = "relacion", icon = icon("project-diagram")),
+      menuItem("Correlaciones", tabName = "correlacion", icon = icon("table")),
+      menuItem("Clusterización", tabName = "cluster", icon = icon("object-group"))
+    )
+  ),
+  dashboardBody(
+    tabItems(
+      tabItem(tabName = "distribucion",
+              fluidRow(
+                box(plotOutput("hist_democracia"), width = 12, title = "Distribución del Índice de Democracia"),
+                box("El histograma muestra cómo se distribuyen los valores de democracia en los países analizados.", width = 12)
+              )),
+      tabItem(tabName = "relacion",
+              fluidRow(
+                box(plotOutput("box_inversion"), width = 6, title = "Boxplot: Inversión por Grupos de Democracia"),
+                box(plotOutput("scatter_relacion"), width = 6, title = "Dispersión: Democracia vs. Inversión")
+              ),
+              box("Cómo la inversión en I+D varía según los niveles de democracia", width = 12)),
+      tabItem(tabName = "correlacion",
+              fluidRow(
+                box(plotOutput("matriz_correlacion"), width = 12, title = "Matriz de Correlación"),
+                box("La matriz indica la relación entre democracia, inversión y otras variables como IDH o PIB.", width = 12)
+              )),
+      tabItem(tabName = "cluster",
+              fluidRow(
+                box(plotOutput("dendrograma"), width = 12, title = "Dendrograma de Clusterización"),
+                box("El dendrograma agrupa países basado en las variables de democracia, inversión y desarrollo económico.", width = 12)
+              ))
+    )
+  )
+)
+
+server <- function(input, output) {
+  output$hist_democracia <- renderPlot({ histograma_democracia() })
+  output$box_inversion <- renderPlot({ boxplot_inversion() })
+  output$scatter_relacion <- renderPlot({ dispersión() })
+  output$matriz_correlacion <- renderPlot({ correlación() })
+  output$dendrograma <- renderPlot({ dendrograma() })
+}
+
+shinyApp(ui = ui, server = server)
+
+```
+
